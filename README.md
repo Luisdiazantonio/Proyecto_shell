@@ -1,2 +1,3 @@
 Revizado, mencionar las modificaciones realizadas, explicar modificacion en servidor
-![image](https://github.com/user-attachments/assets/ec240181-3364-44de-bf2e-14e746833fca)
+MAndar forma de ejecucion, se ejecuto servidor y Minishel y no se conectaron
+despues de ejecuto cliente y servidor, se realizo la conexion pero no mestra nada de shell
