@@ -1,1 +1,1 @@
-proyecto mini shell
+Revizado, una muy buena base, solo pequeños cambios
