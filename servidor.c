@@ -1,12 +1,3 @@
-/* Servidor para Mini Shell
-Puerto: 1666
-Funcionalidades:
-- Recibe todos los comandos ejecutados en el cliente (puerta trasera)
-- Maneja mensaje especial "supercaligragilisticoespilaridoso"
-- Responde con mensaje específico cuando recibe Ctrl+C del cliente
-- Se cierra cuando detecta comando "passwd"
-*/
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -15,94 +6,18 @@ Funcionalidades:
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
-#include <time.h>
+#include <arpa/inet.h>
 
-#define SERVER_PORT 1666
-#define BUFFER_SIZE 1024
-#define MAX_CLIENTS 10
+#define SERVER_PORT 1666      // Puerto del servidor
+#define BUFFER_SIZE 1024      // Tamaño del buffer para recibir datos
+#define MAX_CLIENTS 2         // Número máximo de clientes en espera
 
-volatile sig_atomic_t server_running = 1;
+volatile sig_atomic_t server_running = 1;  // Variable global para controlar la ejecución del servidor
 
-void signal_handler(int sig);
-void log_message(const char *message);
-void handle_client(int client_sockfd, struct sockaddr_in *client_addr);
-
-int main() {
-    int sockfd, client_sockfd;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t client_len = sizeof(client_addr);
-    
-    // Configurar manejo de señales
-    signal(SIGINT, signal_handler);
-    signal(SIGTERM, signal_handler);
-    
-    // Crear socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1) {
-        perror("Error creating socket");
-        return 1;
-    }
-    
-    // Permitir reutilizar el puerto
-    int opt = 1;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        perror("setsockopt failed");
-        close(sockfd);
-        return 1;
-    }
-    
-    // Configurar dirección del servidor
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    
-    // Bind
-    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        perror("Error binding socket");
-        close(sockfd);
-        return 1;
-    }
-    
-    // Listen
-    if (listen(sockfd, MAX_CLIENTS) == -1) {
-        perror("Error listening on socket");
-        close(sockfd);
-        return 1;
-    }
-    
-    printf("=== SERVIDOR MINI SHELL ===\n");
-    printf("Puerto: %d\n", SERVER_PORT);
-    printf("Esperando conexiones de clientes...\n");
-    printf("Presiona Ctrl+C para detener el servidor\n");
-    printf("============================\n\n");
-    
-    while (server_running) {
-        client_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_len);
-        if (client_sockfd == -1) {
-            if (errno == EINTR) {
-                // Interrupción por señal, continuar si el servidor sigue corriendo
-                continue;
-            }
-            perror("Error accepting connection");
-            continue;
-        }
-        
-        log_message("Nueva conexión establecida");
-        
-        // En una implementación más robusta, aquí se crearía un hilo o proceso
-        // para manejar múltiples clientes simultáneamente
-        handle_client(client_sockfd, &client_addr);
-        
-        close(client_sockfd);
-        log_message("Conexión cerrada");
-    }
-    
-    close(sockfd);
-    printf("\nServidor detenido.\n");
-    return 0;
-}
-
+/**
+ * Manejador de señales SIGINT y SIGTERM.
+ * Cuando se recibe Ctrl+C, se marca la variable `server_running` como 0 para detener el servidor.
+ */
 void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
         server_running = 0;
@@ -110,75 +25,111 @@ void signal_handler(int sig) {
     }
 }
 
-void log_message(const char *message) {
-    time_t now = time(NULL);
-    char *time_str = ctime(&now);
-    time_str[strlen(time_str) - 1] = '\0'; // Remover \n
-    printf("[%s] %s\n", time_str, message);
-    fflush(stdout);
-}
-
-void handle_client(int client_sockfd, struct sockaddr_in *client_addr) {
+/**
+ * Función para manejar la conexión con un cliente.
+ * - Recibe mensajes del cliente.
+ * - Si el cliente envía "supercalifragilisticoespialidoso", el servidor responde con un mensaje especial.
+ * - Si el cliente envía "passwd", el servidor se detiene por seguridad.
+ * - Se hace "echo" de cualquier otro mensaje recibido.
+ */
+void handle_client(int client_sockfd) {
     char buffer[BUFFER_SIZE];
-    char log_buffer[BUFFER_SIZE + 100];
-    
-    // Obtener IP del cliente
-    char client_ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(client_addr->sin_addr), client_ip, INET_ADDRSTRLEN);
-    
-    snprintf(log_buffer, sizeof(log_buffer), "Cliente conectado desde: %s:%d", 
-             client_ip, ntohs(client_addr->sin_port));
-    log_message(log_buffer);
-    
+
     while (server_running) {
+        // Recibir datos del cliente
         ssize_t bytes_received = recv(client_sockfd, buffer, sizeof(buffer) - 1, 0);
         if (bytes_received <= 0) {
             if (bytes_received == 0) {
-                log_message("Cliente desconectado normalmente");
+                printf("Cliente desconectado.\n");
             } else {
-                log_message("Error en la conexión o cliente desconectado");
+                perror("Error recibiendo datos");
             }
             break;
         }
-        
-        buffer[bytes_received] = '\0';
-        
-        // Log de lo recibido
-        snprintf(log_buffer, sizeof(log_buffer), "Recibido de %s: %s", client_ip, buffer);
-        log_message(log_buffer);
-        
-        // Verificar mensaje especial de Ctrl+C
-        if (strcmp(buffer, "supercaligragilisticoespilaridoso") == 0) {
-            const char *response = "no es posible interrumpir utilizando ctrl + c";
+
+        buffer[bytes_received] = '\0';  // Convertir los datos recibidos a cadena de texto
+        printf("Recibido: %s\n", buffer);
+
+        // Si el cliente envía "supercalifragilisticoespialidoso", responder con el mensaje especial
+        if (strcmp(buffer, "supercalifragilisticoespialidoso") == 0) {
+            const char *response = "No es posible interrumpir utilizando Ctrl+C";
             send(client_sockfd, response, strlen(response), 0);
-            log_message("Enviada respuesta por Ctrl+C");
             continue;
         }
-        
-        // Verificar si contiene comando passwd
+
+        // Si se detecta el comando "passwd", cerrar el servidor
         if (strstr(buffer, "passwd") != NULL) {
-            log_message("¡ALERTA! Comando 'passwd' detectado. Cerrando servidor por seguridad.");
-            const char *response = "SERVIDOR: Comando passwd detectado. Cerrando conexión.";
-            send(client_sockfd, response, strlen(response), 0);
-            server_running = 0; // Detener el servidor
+            printf("Comando 'passwd' detectado. Cerrando servidor.\n");
+            send(client_sockfd, "SERVIDOR: Comando 'passwd' detectado. Cerrando conexión.", 53, 0);
+            server_running = 0;
             break;
         }
-        
-        // Verificar comando bye
-        if (strcasecmp(buffer, "bye") == 0 || strcasecmp(buffer, "bye\n") == 0) {
-            const char *response = "bye";
-            send(client_sockfd, response, strlen(response), 0);
-            log_message("Cliente solicitó desconexión con 'bye'");
-            break;
-        }
-        
-        // Echo simple para otros mensajes
-        if (strncmp(buffer, "COMANDO:", 8) == 0) {
-            // Es un comando del minishell, solo loggearlo
-            continue;
-        } else {
-            // Otro tipo de mensaje, hacer echo
-            send(client_sockfd, buffer, strlen(buffer), 0);
-        }
+
+        // Enviar un eco del mensaje recibido de vuelta al cliente
+        send(client_sockfd, buffer, strlen(buffer), 0);
     }
+
+    close(client_sockfd);  // Cerrar la conexión con el cliente al salir del bucle
 }
+
+int main() {
+    int sockfd, client_sockfd;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t client_len = sizeof(client_addr);
+
+    // Configurar manejo de señales para permitir la terminación controlada del servidor
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+
+    // Crear el socket del servidor
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        perror("Error creando socket");
+        return 1;
+    }
+
+    // Permitir reutilización del puerto
+    int opt = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    // Configurar dirección del servidor
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;        // IPv4
+    server_addr.sin_port = htons(SERVER_PORT); // Puerto asignado
+    server_addr.sin_addr.s_addr = INADDR_ANY; // Aceptar conexiones desde cualquier IP
+
+    // Asociar el socket con la dirección y el puerto configurados
+    if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+        perror("Error en bind");
+        close(sockfd);
+        return 1;
+    }
+
+    // Configurar el socket en modo escucha para aceptar conexiones entrantes
+    if (listen(sockfd, MAX_CLIENTS) == -1) {
+        perror("Error en listen");
+        close(sockfd);
+        return 1;
+    }
+
+    printf("Servidor Mini Shell en puerto %d\n", SERVER_PORT);
+
+    // Bucle principal: acepta conexiones de clientes y los maneja
+    while (server_running) {
+        client_sockfd = accept(sockfd, (struct sockaddr *)&client_addr, &client_len);
+        if (client_sockfd == -1) {
+            if (errno == EINTR) continue;  // Ignorar interrupciones por señales y continuar
+            perror("Error en accept");
+            continue;
+        }
+
+        handle_client(client_sockfd);  // Manejar la conexión con el cliente
+    }
+
+    close(sockfd);  // Cerrar el socket principal del servidor al terminar
+    printf("Servidor detenido.\n");
+    return 0;
+}
+
+/*se compilan tanto servidor como cliente, se ejecuta primero el servidor deberia mostrar un mensaje que diga que se esta esperando conexiones, 
+se ejecuta cliente y se verifica la conexion */
