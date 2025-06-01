@@ -71,7 +71,7 @@ int main() {
 		printf("Received: %s\n", buffer);
 
 		// Compara con "bye" o "Bye"
-		if (strcasecmp(buffer, "bye") == 0 || strcasecmp(buffer, "bye\n") == 0) {
+		if (strcasecmp(buffer, "passwd") == 0 || strcasecmp(buffer, "bye\n") == 0) {
 			const char *bye_msg = "bye";
 			send(client_sockfd, bye_msg, strlen(bye_msg), 0);
 			printf("Connection closed by keyword\n");
