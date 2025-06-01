@@ -12,18 +12,8 @@ una vez un comando haya sido ejecutado queda como actividad registrada y se pued
 Nota: El programa no cuenta con la capacidad de navegar entre directorios, es decir se mantiene donde se ejecuta. 
 Nota: El tamaño de comandos posible unidos es de 4 por medio de pipes.
 
-
-comandos de prueba  
-    ls | wc -l
-    ls -l | grep "extension archivo"
-    ls -a | grep "^."
-    ps aux | grep palabra
-    cat archivo | wc -l
-    cat archivo | wc -w
-    cat archivo  | grep palabra | wc -c
-    cat archivo | grep palabra | sort | uniq
-    ps -ely|grep daemon|sort -r
-    ps -ely|grep daemon|sort -r| sort -r|sort-r
+Modificaciones por Diaz Antonio Luis Pedro
+modifcacion de cliente servidor
 
 */
 
@@ -35,6 +25,11 @@ comandos de prueba
 #include <unistd.h>
 #include <termios.h>
 #include <sys/wait.h>
+#include <signal.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#define PUERTO 1666
 
 #define MAX_INPUT 1024
 #define MAX_CMDS 4
@@ -43,8 +38,12 @@ comandos de prueba
 
 char history[MAX_HISTORY][MAX_INPUT];
 int history_count = 0;
+int sockfd;
 
 //-----------------------------------------------------PROTOTIPOS--------------------------------------------------------------------
+//enviar y recibir respuesta de servidor
+void enviar_a_servidor(const char *mensaje);
+//
 void enable_raw_mode(struct termios *orig);
 // configuracion estandar de terminal
 void disable_raw_mode(struct termios *orig);
@@ -53,17 +52,42 @@ void redraw_line(const char *prompt, const char *buf, int pos);
 int read_input(char *buf, const char *prompt);
 // Función para dividir un comando en tokens (argumentos)
 void parse_args(char *cmd, char **args);
+//manejo de ctrl + c
+void handle_sigint(int sig);
 
 //-----------------------------------------------------FUNCION PRINCIPAL--------------------------------------------------------------------
 int main() {
+    //conexion con el servidor
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd == -1) {
+		perror("Error creating socket");
+		return 1;
+	}
+
+	struct sockaddr_in server_addr;
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(PUERTO);
+	inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr);
+
+	if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
+		perror("Error connecting to server");
+		close(sockfd);
+		return 1;
+	}
+
     char input[MAX_INPUT];
-    printf("Mini Shell (Ctrl+C para salir)\n");
+    signal(SIGINT, handle_sigint);  // Captura Ctrl+C
+
+    printf("Mini Shell (exit para salir)\n");
     printf("-------------------------------------------\n");
 
     while (1) {
         int len = read_input(input, "$ ");
         if (len == 0) continue;
         if (strcmp(input, "exit") == 0) break;
+        enviar_a_servidor(input);
+
         if (history_count < MAX_HISTORY) {
             strcpy(history[history_count++], input);
         }
@@ -134,11 +158,30 @@ int main() {
             wait(NULL);
         }
     }
-
+    close(sockfd);
     return 0;
 }
 
 //-----------------------------------------------------FUNCIONES--------------------------------------------------------------------
+
+void enviar_a_servidor(const char *mensaje) {
+    send(sockfd, mensaje, strlen(mensaje), 0);
+    char respuesta[128] = "";
+    recv(sockfd, respuesta, sizeof(respuesta) - 1, 0);
+    respuesta[127] = '\0';
+
+    if (strcmp(respuesta, "bye") == 0) {
+        printf("Servidor pidió cerrar por seguridad.\n");
+        close(sockfd);
+        exit(0);
+    } 
+}
+
+void handle_sigint(int sig) {
+    printf("\n[MiniShell] Ctrl+C detectado. Usa 'exit' para salir.\n$ ");
+    fflush(stdout);
+}
+
 
 void enable_raw_mode(struct termios *orig) {
     struct termios raw;
