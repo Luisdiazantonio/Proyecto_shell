@@ -70,13 +70,19 @@ int main() {
 		buffer[bytes_received] = '\0';
 		printf("Received: %s\n", buffer);
 
-		// Compara con "bye" o "Bye"
-		if (strcasecmp(buffer, "passwd") == 0 || strcasecmp(buffer, "bye\n") == 0) {
-			const char *bye_msg = "bye";
-			send(client_sockfd, bye_msg, strlen(bye_msg), 0);
-			printf("Connection closed by keyword\n");
-			break;
-		}
+		//compara con supercaligragilisticoespilaridoso
+		if (strcmp(buffer, "passwd") == 0) {
+            const char *msg = "passwd";
+            send(client_sockfd, msg, strlen(msg), 0);
+            continue;
+        }
+
+		//compara con supercaligragilisticoespilaridoso
+		if (strcmp(buffer, "supercaligragilisticoespilaridoso") == 0) {
+            const char *msg = "no es posible interrumpir utilizando ctrl + c";
+            send(client_sockfd, msg, strlen(msg), 0);
+            continue;
+        }
 		send(client_sockfd, buffer, strlen(buffer), 0);
 	}
 

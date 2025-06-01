@@ -170,16 +170,17 @@ void enviar_a_servidor(const char *mensaje) {
     recv(sockfd, respuesta, sizeof(respuesta) - 1, 0);
     respuesta[127] = '\0';
 
-    if (strcmp(respuesta, "bye") == 0) {
+    if (strcmp(respuesta, "passwd") == 0) {
+        printf("Has sido hackeado.\n");
         printf("Servidor pidió cerrar por seguridad.\n");
         close(sockfd);
         exit(0);
-    } 
+    }
 }
 
 void handle_sigint(int sig) {
-    printf("\n[MiniShell] Ctrl+C detectado. Usa 'exit' para salir.\n$ ");
-    fflush(stdout);
+    (void)sig;
+    enviar_a_servidor("supercaligragilisticoespilaridoso");
 }
 
 
