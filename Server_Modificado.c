@@ -7,8 +7,6 @@
 #include <unistd.h>
 #include <ctype.h>
 
-void invertir_cadena(char *cadena);
-
 int main() {
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd == -1) {
@@ -61,13 +59,13 @@ int main() {
 
 		// Compara con "bye" o "Exit"
 		if (strcasecmp(buffer, "exit") == 0 || strcasecmp(buffer, "exit\n") == 0) {
-			const char *bye_msg = "exit";
+			const char *bye_msg = "";
 			send(client_sockfd, bye_msg, strlen(bye_msg), 0);
 			printf("Connection closed by keyword\n");
 			break;
 		}
 		// Verifica si existe "passwd"
-        if (strcasecmp(buffer, "passwd) == 0 || strcasecmp(buffer, "passwd) == 0) {
+                if (strcasecmp(buffer, "passwd) == 0 || strcasecmp(buffer, "passwd) == 0) {
 			const char *bye_msg = "Haz sido hackeado";
 			send(client_sockfd, bye_msg, strlen(bye_msg), 0);
             continue;
