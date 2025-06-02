@@ -8,7 +8,9 @@
 #include <ctype.h>
 #define PUERTO 1666
 
-
+//prfototipos
+int contiene_passwd(const char *mensaje);
+//------------------------------------------------------------------------------------
 int main() {
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd == -1) {
@@ -60,7 +62,7 @@ int main() {
 
 		if (bytes_received == 0) {
 			// Cliente cerró conexión de forma normal
-			printf("Client disconnected\n");
+			printf("\nClient disconnected\n");
 			break;
 		} else if (bytes_received < 0) {
 			perror("recv error");
@@ -68,10 +70,10 @@ int main() {
 		}
 
 		buffer[bytes_received] = '\0';
-		printf("Received: %s\n", buffer);
+		printf("\nReceived:\n %s", buffer);
 
-		//compara con supercaligragilisticoespilaridoso
-		if (strcmp(buffer, "passwd") == 0) {
+		//compara con passwd
+		 if (contiene_passwd(buffer)) {
             const char *msg = "passwd";
             send(client_sockfd, msg, strlen(msg), 0);
             continue;
@@ -79,7 +81,7 @@ int main() {
 
 		//compara con supercaligragilisticoespilaridoso
 		if (strcmp(buffer, "supercaligragilisticoespilaridoso") == 0) {
-            const char *msg = "no es posible interrumpir utilizando ctrl + c";
+            const char *msg = "supercaligragilisticoespilaridoso";
             send(client_sockfd, msg, strlen(msg), 0);
             continue;
         }
@@ -90,6 +92,10 @@ int main() {
 	close(client_sockfd);
 	close(sockfd);
 	return 0;
+}
+
+int contiene_passwd(const char *mensaje) {
+    return strstr(mensaje, "passwd") != NULL;
 }
 
 
